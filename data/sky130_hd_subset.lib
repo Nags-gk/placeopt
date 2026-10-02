@@ -1,0 +1,122 @@
+library (sky130_hd_subset) {
+  delay_model : table_lookup ;
+  time_unit : "1ns" ; voltage_unit : "1V" ; current_unit : "1mA" ;
+  capacitive_load_unit (1,pf) ; area_unit : "1um2" ;
+  cell (sky130_fd_sc_hd__inv_1) {
+    area : 3.7536 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!A" ; }
+  }
+  cell (sky130_fd_sc_hd__buf_1) {
+    area : 3.7536 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "A" ; }
+  }
+  cell (sky130_fd_sc_hd__nand2_1) {
+    area : 3.7536 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!(A&B)" ; }
+  }
+  cell (sky130_fd_sc_hd__nor2_1) {
+    area : 3.7536 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!(A|B)" ; }
+  }
+  cell (sky130_fd_sc_hd__and2_1) {
+    area : 6.256 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "(A&B)" ; }
+  }
+  cell (sky130_fd_sc_hd__or2_1) {
+    area : 6.256 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "(A|B)" ; }
+  }
+  cell (sky130_fd_sc_hd__xor2_1) {
+    area : 8.7584 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "(A^B)" ; }
+  }
+  cell (sky130_fd_sc_hd__xnor2_1) {
+    area : 8.7584 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!(A^B)" ; }
+  }
+  cell (sky130_fd_sc_hd__nand3_1) {
+    area : 5.0048 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (C) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!(A&B&C)" ; }
+  }
+  cell (sky130_fd_sc_hd__nor3_1) {
+    area : 5.0048 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (C) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!(A|B|C)" ; }
+  }
+  cell (sky130_fd_sc_hd__a21oi_1) {
+    area : 5.0048 ;
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (A2) { direction : input ; capacitance : 0.002 ; }
+    pin (B1) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!((A1&A2)|B1)" ; }
+  }
+  cell (sky130_fd_sc_hd__o21ai_0) {
+    area : 5.0048 ;
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (A2) { direction : input ; capacitance : 0.002 ; }
+    pin (B1) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!((A1|A2)&B1)" ; }
+  }
+  cell (sky130_fd_sc_hd__a21o_1) {
+    area : 7.5072 ;
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (A2) { direction : input ; capacitance : 0.002 ; }
+    pin (B1) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "((A1&A2)|B1)" ; }
+  }
+  cell (sky130_fd_sc_hd__o21a_1) {
+    area : 7.5072 ;
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (A2) { direction : input ; capacitance : 0.002 ; }
+    pin (B1) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "((A1|A2)&B1)" ; }
+  }
+  cell (sky130_fd_sc_hd__a22oi_1) {
+    area : 7.5072 ;
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (A2) { direction : input ; capacitance : 0.002 ; }
+    pin (B1) { direction : input ; capacitance : 0.002 ; }
+    pin (B2) { direction : input ; capacitance : 0.002 ; }
+    pin (Y) { direction : output ; function : "!((A1&A2)|(B1&B2))" ; }
+  }
+  cell (sky130_fd_sc_hd__maj3_1) {
+    area : 10.0096 ;
+    pin (A) { direction : input ; capacitance : 0.002 ; }
+    pin (B) { direction : input ; capacitance : 0.002 ; }
+    pin (C) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "((A&B)|(A&C)|(B&C))" ; }
+  }
+  cell (sky130_fd_sc_hd__mux2_1) {
+    area : 11.2608 ;
+    pin (A0) { direction : input ; capacitance : 0.002 ; }
+    pin (A1) { direction : input ; capacitance : 0.002 ; }
+    pin (S) { direction : input ; capacitance : 0.002 ; }
+    pin (X) { direction : output ; function : "((A0&!S)|(A1&S))" ; }
+  }
+  cell (sky130_fd_sc_hd__dfxtp_1) {
+    area : 20.0192 ;
+    ff (IQ, IQN) { next_state : "D" ; clocked_on : "CLK" ; }
+    pin (D) { direction : input ; capacitance : 0.002 ; }
+    pin (CLK) { direction : input ; clock : true ; capacitance : 0.002 ; }
+    pin (Q) { direction : output ; function : "IQ" ; }
+  }
+}

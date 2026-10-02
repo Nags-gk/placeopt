@@ -1,0 +1,7 @@
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.sc_src/
+placeopt/_core*.so
+data/yosys/

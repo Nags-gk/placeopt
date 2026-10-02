@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.18)
+project(placeopt CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+add_library(placeopt_core STATIC cpp/src/placer.cpp)
+target_include_directories(placeopt_core PUBLIC cpp/include)
+target_compile_options(placeopt_core PRIVATE -Wall -Wextra)
+
+find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+execute_process(COMMAND ${Python_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
+                OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+find_package(pybind11 CONFIG REQUIRED)
+pybind11_add_module(_core cpp/src/bindings.cpp)
+target_link_libraries(_core PRIVATE placeopt_core)
+set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/placeopt)
+
+enable_testing()
+add_executable(test_placer cpp/tests/test_placer.cpp)
+target_link_libraries(test_placer PRIVATE placeopt_core)
+target_compile_options(test_placer PRIVATE -UNDEBUG)
+add_test(NAME cpp_placer COMMAND test_placer)

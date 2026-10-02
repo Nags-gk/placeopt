@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlaceOpt: Cell Placement</title>
+<meta name="description" content="C++17 simulated-annealing and analytical standard-cell placement on Yosys-synthesized SKY130 netlists, benchmarked against exact CP-SAT optima.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf7;--panel:#fff;--ink:#1d1f23;--muted:#5d636d;--line:#e3e0d9;--accent:#2a78d6;--good:#1a9e6e;--bad:#c2405a;--chip:#f1efe9;--die:#f6f4ee}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121417;--panel:#1a1d21;--ink:#e8e6e1;--muted:#9aa0a8;--line:#2c3036;--accent:#5a9be8;--good:#3cc28f;--bad:#e46a82;--chip:#23272d;--die:#16191c}}
+:root[data-theme="dark"]{--bg:#121417;--panel:#1a1d21;--ink:#e8e6e1;--muted:#9aa0a8;--line:#2c3036;--accent:#5a9be8;--good:#3cc28f;--bad:#e46a82;--chip:#23272d;--die:#16191c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:1060px;margin:0 auto;padding:40px 16px 80px}
+h1{font-size:30px;margin:0 0 8px;font-weight:600;letter-spacing:-.01em}
+h2{font-size:19px;margin:46px 0 6px;font-weight:600}
+.lead{color:var(--muted);max-width:780px;margin:0 0 18px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 14px;max-width:800px}
+a{color:var(--accent)}
+code{font-family:"IBM Plex Mono",monospace;font-size:13px}
+.links{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 26px}
+.links a{border:1px solid var(--line);padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--ink);background:var(--panel);font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.card .v{font-size:24px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.card .n{font-size:13px;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tablewrap{overflow-x:auto}
+.best{color:var(--good);font-weight:600}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:5px 10px;font:13px "IBM Plex Sans";cursor:pointer}
+.toolbar button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.toolbar label{font-size:13px;color:var(--muted)}
+canvas.die{width:100%;height:auto;display:block;border-radius:6px}
+.chart{position:relative;height:300px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+input[type=range]{width:220px}
+footer{margin-top:60px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <h1>PlaceOpt</h1>
+  <p class="lead">Standard-cell placement as combinatorial optimization. A C++17 simulated-annealing placer and an analytical
+  flow (quadratic global placement, then legalization, then detailed placement) run on netlists synthesized by Yosys onto real
+  SkyWater SKY130 HD cells, with cell footprints and pin locations taken from the LEF files. On small instances, results are checked against exact optima from OR-Tools CP-SAT.</p>
+  <div class="links">
+    <a href="https://github.com/Nags-gk/placeopt">Source on GitHub</a>
+    <a href="#viewer">Placement viewer</a>
+    <a href="#exact">Optimality gap</a>
+  </div>
+  <div class="cards" id="cards"></div>
+
+  <h2 id="viewer">Placement viewer</h2>
+  <p class="sub">Cells are drawn at their legal row and site positions, colored by cell function. Thin lines are the nets of the 120 longest connections. Use the slider to step through a simulated-annealing run as the temperature drops. The objective is HPWL only, with no density or congestion term, so the analytical flow packs cells toward the input pins on the left edge. A production placer would spread them for routability.</p>
+  <div class="panel">
+    <div class="toolbar" id="designBtns"></div>
+    <div class="toolbar" id="methodBtns"></div>
+    <div class="toolbar" id="animBar" hidden>
+      <label for="snap">SA progress</label><input id="snap" type="range" min="0" max="0" value="0">
+      <span class="note" id="snapLbl" style="margin:0"></span>
+    </div>
+    <canvas class="die" id="die" width="1000" height="700" role="img" aria-label="Placement of standard cells"></canvas>
+    <p class="note" id="dieNote"></p>
+  </div>
+
+  <h2>Flow comparison</h2>
+  <p class="sub">Median HPWL over 5 seeds (lower is better) and median runtime on a 2-core cloud VM. Utilization is 60%, inputs sit on the left die edge and outputs on the right, and clock nets are excluded because clock-tree synthesis routes them.</p>
+  <div class="grid2">
+    <div class="panel"><div class="chart"><canvas id="qual"></canvas></div></div>
+    <div class="panel"><div class="chart"><canvas id="speed"></canvas></div></div>
+  </div>
+  <div class="panel tablewrap" style="margin-top:12px"><table id="flowTable"></table></div>
+
+  <h2>Annealing schedule</h2>
+  <p class="sub">VPR-style adaptive schedule: the cooling rate depends on the acceptance ratio, and the move-range window shrinks to keep acceptance near 44%.</p>
+  <div class="grid2">
+    <div class="panel"><div class="chart"><canvas id="cool"></canvas></div></div>
+    <div class="panel"><div class="chart"><canvas id="acc"></canvas></div></div>
+  </div>
+
+  <h2 id="exact">Optimality gap vs. CP-SAT</h2>
+  <p class="sub">For small netlists, CP-SAT proves the minimum-HPWL placement on the same grid, with the same pin offsets and terminals. The gap shows how far simulated annealing (best and median of 10 seeds) lands from the true optimum.</p>
+  <div class="panel tablewrap"><table id="exactTable"></table><p class="note" id="exactNote"></p></div>
+
+  <footer>Built with Yosys 0.33, the SkyWater SKY130 HD standard-cell LEFs (Apache-2.0), OR-Tools CP-SAT, pybind11 and Chart.js.
+  Source: <a href="https://github.com/Nags-gk/placeopt">github.com/Nags-gk/placeopt</a>.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (x, d = 0) => x == null ? "—" : Number(x).toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d});
+const LBL = {random: "Random legal", sa: "Simulated annealing", gp_lg: "Global + legalize", gp_lg_dp: "Global + legalize + detailed"};
+const COL = {random: "#8a8f98", sa: "#d97a1e", gp_lg: "#7b53c4", gp_lg_dp: "#1a9e6e"};
+const FAMILY = t => t.startsWith("dfx") ? "flop" : /xor|xnor/.test(t) ? "xor" : /mux|maj/.test(t) ? "mux" :
+  /a21|o21|a22/.test(t) ? "aoi" : /nand|nor/.test(t) ? "nand" : /inv|buf/.test(t) ? "buf" : "andor";
+const FCOL = {flop: "#c2405a", xor: "#2a78d6", mux: "#7b53c4", aoi: "#d97a1e", nand: "#1a9e6e", buf: "#8a8f98", andor: "#b8a03a"};
+
+fetch("data/results.json").then(r => r.json()).then(D => {
+  Chart.defaults.color = css("--muted"); Chart.defaults.borderColor = css("--line"); Chart.defaults.font.family = "\"IBM Plex Sans\", system-ui, -apple-system, Segoe UI, sans-serif";
+  const F = D.flows, names = Object.keys(F);
+  // cards
+  const big = names[names.length - 1], bm = F[big].methods;
+  const speedup = bm.sa.median_seconds / bm.gp_lg_dp.median_seconds;
+  const ex = (D.exact || []).filter(r => r.status === "OPTIMAL");
+  const medGap = ex.length ? ex.map(r => r.gap_best_pct).sort((a, b) => a - b)[Math.floor(ex.length / 2)] : null;
+  document.getElementById("cards").innerHTML = [
+    ["Designs", names.length, `${F[names[0]].cells}–${F[big].cells} cells`],
+    ["vs. random", `${fmt(100 * (1 - bm.gp_lg_dp.median_hpwl / bm.random.median_hpwl))}% shorter`, `HPWL on ${big}`],
+    ["Analytical flow", `${fmt(speedup, 1)}× faster`, `than pure SA on ${big}, HPWL ${fmt(100 * (bm.gp_lg_dp.median_hpwl / bm.sa.median_hpwl - 1), 1)}%`],
+    ["Optimality gap", medGap == null ? "—" : `${fmt(medGap, 1)}%`, `median SA best-of-10, ${ex.length} proven optima`],
+  ].map(([k, v, n]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+
+  // flow charts
+  const methods = ["random", "sa", "gp_lg", "gp_lg_dp"];
+  const ds = (key, norm) => methods.filter(m => !(key === "median_seconds" && m === "random")).map(m => ({
+    label: LBL[m], backgroundColor: COL[m], borderColor: COL[m],
+    data: names.map(n => norm ? F[n].methods[m][key] / F[n].methods.sa[key] : F[n].methods[m][key])}));
+  new Chart(document.getElementById("qual"), {type: "bar", data: {labels: names, datasets: ds("median_hpwl", true).filter(d => d.label !== LBL.random)},
+    options: {maintainAspectRatio: false, animation: false, plugins: {title: {display: true, text: "HPWL relative to simulated annealing (1.0 = SA)"}, legend: {position: "bottom", labels: {boxWidth: 12}}},
+      scales: {y: {min: 0.6, title: {display: true, text: "HPWL / SA HPWL"}}}}});
+  new Chart(document.getElementById("speed"), {type: "line", data: {datasets: ["sa", "gp_lg_dp"].map(m => ({
+      label: LBL[m], borderColor: COL[m], backgroundColor: COL[m], showLine: true, tension: 0,
+      data: names.map(n => ({x: F[n].cells, y: F[n].methods[m].median_seconds}))}))},
+    options: {maintainAspectRatio: false, animation: false, parsing: false,
+      plugins: {title: {display: true, text: "Runtime vs. design size"}, legend: {position: "bottom", labels: {boxWidth: 12}}},
+      scales: {x: {type: "logarithmic", title: {display: true, text: "cells"}, ticks: {callback: v => [1, 10, 100, 1000].includes(v) ? v : ""}},
+               y: {type: "logarithmic", title: {display: true, text: "seconds"}, ticks: {callback: v => [0.001, 0.01, 0.1, 1, 10].includes(v) ? v + " s" : ""}}}}});
+  document.getElementById("flowTable").innerHTML = `<tr><th>Design</th><th>Cells</th><th>Random</th><th>SA</th><th>SA time</th><th>Global+LG</th><th>Global+LG+DP</th><th>G+LG+DP time</th></tr>` +
+    names.map(n => { const m = F[n].methods; const best = Math.min(m.sa.median_hpwl, m.gp_lg.median_hpwl, m.gp_lg_dp.median_hpwl);
+      const c = v => `<td class="${v === best ? "best" : ""}">${fmt(v)}</td>`;
+      return `<tr><td>${n}</td><td>${F[n].cells}</td><td>${fmt(m.random.median_hpwl)}</td>${c(m.sa.median_hpwl)}<td>${fmt(m.sa.median_seconds, 2)} s</td>${c(m.gp_lg.median_hpwl)}${c(m.gp_lg_dp.median_hpwl)}<td>${fmt(m.gp_lg_dp.median_seconds, 2)} s</td></tr>`; }).join("") +
+    `<tr><td colspan="8" style="text-align:left" class="note">HPWL in µm. Green marks the best of the three optimizing flows.</td></tr>`;
+
+  // schedule charts
+  const V = D.viz, trace = V.mult8.methods.sa.trace;
+  new Chart(document.getElementById("cool"), {type: "line", data: {datasets: [
+      {label: "HPWL (µm)", data: trace.map((t, i) => ({x: i, y: t.cost})), borderColor: COL.sa, pointRadius: 0, yAxisID: "y"},
+      {label: "temperature", data: trace.map((t, i) => ({x: i, y: t.temp})), borderColor: css("--muted"), borderDash: [4, 3], pointRadius: 0, yAxisID: "y2"}]},
+    options: {maintainAspectRatio: false, animation: false, parsing: false, plugins: {title: {display: true, text: "mult8: cost and temperature per step"}, legend: {position: "bottom", labels: {boxWidth: 12}}},
+      scales: {x: {type: "linear", title: {display: true, text: "temperature step"}}, y: {title: {display: true, text: "HPWL"}}, y2: {type: "logarithmic", position: "right", grid: {display: false}}}}});
+  new Chart(document.getElementById("acc"), {type: "line", data: {datasets: [
+      {label: "acceptance rate", data: trace.map((t, i) => ({x: i, y: t.accept})), borderColor: COL.gp_lg_dp, pointRadius: 0},
+      {label: "range window (fraction of die)", data: trace.map((t, i) => ({x: i, y: t.window})), borderColor: COL.gp_lg, pointRadius: 0}]},
+    options: {maintainAspectRatio: false, animation: false, parsing: false, plugins: {title: {display: true, text: "mult8: acceptance and range limit"}, legend: {position: "bottom", labels: {boxWidth: 12}}},
+      scales: {x: {type: "linear", title: {display: true, text: "temperature step"}}, y: {min: 0, max: 1}}}});
+
+  // exact table
+  if (D.exact) {
+    document.getElementById("exactTable").innerHTML = `<tr><th>Instance</th><th>Cells</th><th>CP-SAT status</th><th>Optimum</th><th>SA best of 10</th><th>Gap (best)</th><th>Gap (median)</th><th>SA long, best</th><th>CP-SAT time</th></tr>` +
+      D.exact.map(r => `<tr><td>${r.case}</td><td>${r.cells}</td><td>${r.status}</td><td>${fmt(r.hpwl, 2)}</td><td>${fmt(r.sa_best, 2)}</td>
+        <td class="${r.gap_best_pct < 0.01 ? "best" : ""}">${r.gap_best_pct == null ? "—" : fmt(r.gap_best_pct, 2) + "%"}</td>
+        <td>${r.gap_median_pct == null ? "—" : fmt(r.gap_median_pct, 2) + "%"}</td>
+        <td>${r.sa_long_best == null ? "—" : fmt(100 * (r.sa_long_best - r.hpwl) / r.hpwl, 2) + "%"}</td><td>${fmt(r.seconds, 1)} s</td></tr>`).join("");
+    document.getElementById("exactNote").textContent = "HPWL in µm. FEASIBLE means CP-SAT hit its time limit before proving optimality, so the gap is measured against its best solution. \"SA long\" is the same annealer with 10× more moves per temperature.";
+  }
+
+  // viewer
+  const canvas = document.getElementById("die"), ctx = canvas.getContext("2d");
+  let cur = {design: "mult8", method: "gp_lg_dp", snap: null};
+  const btns = (el, items, key) => { el.innerHTML = items.map(([v, t]) => `<button data-v="${v}" aria-pressed="${cur[key] === v}">${t}</button>`).join("");
+    el.onclick = e => { const b = e.target.closest("button"); if (!b) return; cur[key] = b.dataset.v; cur.snap = null;
+      [...el.children].forEach(x => x.setAttribute("aria-pressed", x === b)); draw(); }; };
+  btns(document.getElementById("designBtns"), Object.keys(V).map(k => [k, `${k} (${V[k].width.length} cells)`]), "design");
+  btns(document.getElementById("methodBtns"), methods.map(m => [m, LBL[m]]), "method");
+  const slider = document.getElementById("snap");
+  slider.oninput = () => { cur.snap = +slider.value; draw(); };
+  function draw() {
+    const v = V[cur.design], m = v.methods[cur.method];
+    const anim = cur.method === "sa" && v.sa_snapshots;
+    document.getElementById("animBar").hidden = !anim;
+    let pl = m.placement, label = `${LBL[cur.method]} · HPWL ${fmt(m.hpwl)} µm`;
+    if (anim) { slider.max = v.sa_snapshots.length - 1; if (cur.snap == null) cur.snap = v.sa_snapshots.length - 1; slider.value = cur.snap;
+      pl = v.sa_snapshots[cur.snap]; document.getElementById("snapLbl").textContent = `snapshot ${cur.snap + 1} of ${v.sa_snapshots.length}`; }
+    const W = v.sites * v.site_w, H = v.rows * v.row_h, pad = 14;
+    const scale = Math.min((canvas.width - 2 * pad) / W, 900 / H);
+    canvas.height = Math.ceil(H * scale + 2 * pad);
+    ctx.fillStyle = css("--panel"); ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = css("--die"); ctx.fillRect(pad, pad, W * scale, H * scale);
+    ctx.strokeStyle = css("--line"); ctx.lineWidth = 0.5;
+    for (let r = 0; r <= v.rows; r++) { ctx.beginPath(); ctx.moveTo(pad, pad + r * v.row_h * scale); ctx.lineTo(pad + W * scale, pad + r * v.row_h * scale); ctx.stroke(); }
+    const cx = c => pad + (pl.site[c] * v.site_w + v.width[c] * v.site_w / 2) * scale;
+    const cy = c => pad + (H - (pl.row[c] + 0.5) * v.row_h) * scale;
+    // flylines for the longest nets
+    const pos = o => o >= 0 ? [cx(o), cy(o)] : [pad + v.term_x[-1 - o] * scale, pad + (H - v.term_y[-1 - o]) * scale];
+    const spans = v.nets.map(n => { const ps = n.map(pos); const xs = ps.map(p => p[0]), ys = ps.map(p => p[1]);
+      return [Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys), ps]; }).sort((a, b) => b[0] - a[0]).slice(0, 120);
+    ctx.strokeStyle = css("--muted"); ctx.globalAlpha = 0.25; ctx.lineWidth = 0.8;
+    for (const [, ps] of spans) { const [x0, y0] = ps[0]; for (const [x, y] of ps.slice(1)) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x, y); ctx.stroke(); } }
+    ctx.globalAlpha = 1;
+    for (let c = 0; c < v.width.length; c++) {
+      ctx.fillStyle = FCOL[FAMILY(v.types[c])];
+      ctx.fillRect(pad + pl.site[c] * v.site_w * scale + 0.5, pad + (H - (pl.row[c] + 1) * v.row_h) * scale + 1,
+                   v.width[c] * v.site_w * scale - 1, v.row_h * scale - 2);
+    }
+    ctx.fillStyle = css("--ink");
+    for (let t = 0; t < v.term_x.length; t++) { const [x, y] = pos(-1 - t); ctx.fillRect(x - 3, y - 3, 6, 6); }
+    const legend = Object.entries(FCOL).map(([k, c]) => `<span style="color:${c}">■</span> ${k}`).join(" &nbsp; ");
+    document.getElementById("dieNote").innerHTML = `${label} · die ${fmt(W, 1)} × ${fmt(H, 1)} µm, ${v.rows} rows · ${legend} · <b>■</b> I/O pin`;
+  }
+  draw();
+}).catch(e => { document.getElementById("cards").textContent = "Could not load results: " + e; });
+</script>
+</body>
+</html>
